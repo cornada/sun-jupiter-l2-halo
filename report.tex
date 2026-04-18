@@ -49,6 +49,14 @@ in the Circular Restricted Three-Body Problem}
 \maketitle
 \thispagestyle{fancy}
 
+\begin{center}
+\fbox{\parbox{0.95\textwidth}{\centering\small
+\textbf{Interactive live demo:} \href{https://cornada.github.io/sun-jupiter-l2-halo/}{\texttt{https://cornada.github.io/sun-jupiter-l2-halo/}}  \quad$\cdot$\quad
+\textbf{Source:} \href{https://github.com/cornada/sun-jupiter-l2-halo}{\texttt{github.com/cornada/sun-jupiter-l2-halo}}
+}}
+\end{center}
+\vspace{0.4cm}
+
 \begin{abstract}
 We construct closed periodic orbits near the collinear libration point $L_2$ of the Sun--Jupiter Circular Restricted Three-Body Problem (CR3BP) and develop a minimum--energy station-keeping strategy based on Floquet analysis of the monodromy matrix. Using a two-dimensional Newton--Raphson differential corrector built on the variational equations, we converge a planar Lyapunov orbit ($A_z = 0$, $T \approx 3.179$, unstable eigenvalue $\lambda_u \approx 1752$) to $3\times 10^{-8}$ residual, verify closure by a machine--precision Jacobi integral drift of $1.3\times 10^{-15}$ per revolution, and continue the full three-dimensional halo family in the parameter $A_z \in [2\times 10^{-3}, 2\times 10^{-2}]$ (13 family members, $\lambda_u$ decreasing from $1800$ to $1100$ along the branch). From the monodromy eigenstructure we derive an exact formula $|\Delta v|_{\min}(t) = |\alpha_u|/\|L_v(t)\|$ relating the minimum correction magnitude to the propagated left eigenvector and identify the unique cheapest phase on each orbit: the perpendicular $x$-axis crossing, with a $1652\times$ fuel advantage over the worst phase. We globalize both stable and unstable manifolds into three-dimensional invariant tubes around the halo ($96$ manifold trajectories), demonstrate a single-shot correction with machine--precision energy book-keeping (residual $1.7\times 10^{-16}$ on the identity $\Delta C = -2\Delta\mathrm{KE}$), and benchmark multi-shooting station-keeping at $K \in \{1,2,4,8,16\}$ correction nodes per period. A complete gallery of 36 figures documents every aspect of the pipeline. All source code, figure data, and the report itself are reproducible from a single Python driver.
 \end{abstract}
@@ -643,6 +651,13 @@ in the Sun--Jupiter $L_2$ context specifically. The underlying mathematics is cl
 %==================================================================
 
 A single-file web demonstration (\texttt{demo.html}) accompanies this report. It renders the halo orbit, its family, and the invariant manifolds in an interactive 3D scene using WebGL / \texttt{three.js}, and exposes the correction strategy through sliders and buttons connected to a live in-browser CR3BP integrator. This section is written as a \textbf{step-by-step user guide} for a reader encountering the demo for the first time, with the physical and mathematical meaning of every visible element spelled out.
+
+\begin{center}
+\fbox{\parbox{0.9\textwidth}{\centering
+\textbf{Live demo:} \href{https://cornada.github.io/sun-jupiter-l2-halo/}{\texttt{cornada.github.io/sun-jupiter-l2-halo}}\\
+\textbf{Source:} \href{https://github.com/cornada/sun-jupiter-l2-halo}{\texttt{github.com/cornada/sun-jupiter-l2-halo}}
+}}
+\end{center}
 
 \subsection{Launching the demo}\label{sec:demo:launch}
 
