@@ -477,14 +477,25 @@ function updateSC() {
 }
 
 // ==== Camera presets ====
+function orbitExtent() {
+  let rmax = 0, zmax = 0;
+  currentFam.orbit.forEach(u => {
+    const r = Math.sqrt((u[0]-x_L2)**2 + u[1]**2);
+    if (r > rmax) rmax = r;
+    if (Math.abs(u[2]) > zmax) zmax = Math.abs(u[2]);
+  });
+  return { rmax, zmax };
+}
+
 function setCamera(preset) {
-  const R = 0.08;
-  const tgt = new THREE.Vector3(x_L2, 0, 0.005);
+  const ext = orbitExtent();
+  const R = Math.max(0.04, 3.5 * ext.rmax);  // frame camera to orbit size
+  const tgt = new THREE.Vector3(x_L2, 0, ext.zmax * 0.3);
   controls.target.copy(tgt);
   switch (preset) {
     case 'front': camera.position.set(x_L2, 0, R); break;
-    case 'top':   camera.position.set(x_L2, R, 0.001); break;
-    case 'side':  camera.position.set(x_L2+R, 0, 0.005); break;
+    case 'top':   camera.position.set(x_L2, R, ext.zmax); break;
+    case 'side':  camera.position.set(x_L2+R, 0, ext.zmax*0.5); break;
     case 'iso':   camera.position.set(x_L2+R*0.6, R*0.6, R*0.6); break;
   }
   camera.lookAt(tgt);
