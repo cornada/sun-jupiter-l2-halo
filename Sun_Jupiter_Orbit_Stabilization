@@ -1,0 +1,406 @@
+import numpy as np
+from scipy.integrate import solve_ivp
+from scipy.optimize import root_scalar
+import matplotlib.pyplot as plt
+
+# ============================================================
+# TRAJECTORY IN DIRECTION OF INCREMENT OF INSTABILITY
+# ============================================================
+
+
+# ============================================================
+# 1. PARAMETERS
+# ============================================================
+mu = 9.53e-4
+t0 = 0.0
+tf = 50
+N = 10000
+
+eps = 1e-4
+vy_init = 0.02
+
+# ============================================================
+# 2. DISTANCES TO THE PRIMARIES
+# ============================================================
+def r1(x, y, z, mu):
+    return np.sqrt((x + mu)**2 + y**2 + z**2)
+
+def r2(x, y, z, mu):
+    return np.sqrt((x - (1 - mu))**2 + y**2 + z**2)
+
+# ============================================================
+# 3. FIRST DERIVATIVES OF OMEGA
+# ============================================================
+def dOmega_dx(x, y, z, mu):
+    R1 = r1(x, y, z, mu)
+    R2 = r2(x, y, z, mu)
+    return x - (1 - mu) * (x + mu) / R1**3 - mu * (x - (1 - mu)) / R2**3
+
+def dOmega_dy(x, y, z, mu):
+    R1 = r1(x, y, z, mu)
+    R2 = r2(x, y, z, mu)
+    return y - (1 - mu) * y / R1**3 - mu * y / R2**3
+
+def dOmega_dz(x, y, z, mu):
+    R1 = r1(x, y, z, mu)
+    R2 = r2(x, y, z, mu)
+    return -(1 - mu) * z / R1**3 - mu * z / R2**3
+
+# ============================================================
+# 4. FIND L2
+# ============================================================
+def find_L2(mu):
+    f = lambda x: dOmega_dx(x, 0.0, 0.0, mu)
+    sol = root_scalar(f, bracket=[1 - mu + 1e-4, 1.5], method='brentq')
+    return sol.root
+
+x_L2 = find_L2(mu)
+
+# ============================================================
+# 5. SECOND DERIVATIVES OF OMEGA
+# ============================================================
+def omega_second_derivatives(x, y, z, mu):
+    R1sq = (x + mu)**2 + y**2 + z**2
+    R2sq = (x - (1 - mu))**2 + y**2 + z**2
+
+    R1 = np.sqrt(R1sq)
+    R2 = np.sqrt(R2sq)
+
+    R1_3 = R1sq * R1
+    R1_5 = R1sq * R1_3
+    R2_3 = R2sq * R2
+    R2_5 = R2sq * R2_3
+
+    mu1 = 1 - mu
+    mu2 = mu
+
+    Oxx = (
+        1
+        - mu1 * (1 / R1_3 - 3 * (x + mu)**2 / R1_5)
+        - mu2 * (1 / R2_3 - 3 * (x - (1 - mu))**2 / R2_5)
+    )
+
+    Oyy = (
+        1
+        - mu1 * (1 / R1_3 - 3 * y**2 / R1_5)
+        - mu2 * (1 / R2_3 - 3 * y**2 / R2_5)
+    )
+
+    Ozz = (
+        - mu1 * (1 / R1_3 - 3 * z**2 / R1_5)
+        - mu2 * (1 / R2_3 - 3 * z**2 / R2_5)
+    )
+
+    Oxy = 3 * y * (
+        mu1 * (x + mu) / R1_5 +
+        mu2 * (x - (1 - mu)) / R2_5
+    )
+
+    Oxz = 3 * z * (
+        mu1 * (x + mu) / R1_5 +
+        mu2 * (x - (1 - mu)) / R2_5
+    )
+
+    Oyz = 3 * y * z * (
+        mu1 / R1_5 +
+        mu2 / R2_5
+    )
+
+    return Oxx, Oyy, Ozz, Oxy, Oxz, Oyz
+
+# ============================================================
+# 6. JACOBIAN
+# ============================================================
+def jacobian_3d(x, y, z, mu):
+    Oxx, Oyy, Ozz, Oxy, Oxz, Oyz = omega_second_derivatives(x, y, z, mu)
+
+    A = np.array([
+        [0,   0,   0,   1,  0,  0],
+        [0,   0,   0,   0,  1,  0],
+        [0,   0,   0,   0,  0,  1],
+        [Oxx, Oxy, Oxz, 0,  2,  0],
+        [Oxy, Oyy, Oyz, -2, 0,  0],
+        [Oxz, Oyz, Ozz, 0,  0,  0]
+    ], dtype=float)
+
+    return A
+
+# ============================================================
+# 7. FULL 3D CR3BP SYSTEM
+# ============================================================
+def cr3bp_3d(t, U, mu):
+    x, y, z, vx, vy, vz = U
+
+    ax = 2 * vy + dOmega_dx(x, y, z, mu)
+    ay = -2 * vx + dOmega_dy(x, y, z, mu)
+    az = dOmega_dz(x, y, z, mu)
+
+    return [vx, vy, vz, ax, ay, az]
+
+# ============================================================
+# 8. LINEARIZATION AT L2
+# ============================================================
+A_L2 = jacobian_3d(x_L2, 0.0, 0.0, mu)
+eigvals, eigvecs = np.linalg.eig(A_L2)
+
+unstable_index = np.argmax(np.real(eigvals))
+lambda_u = eigvals[unstable_index]
+v_u = eigvecs[:, unstable_index]
+
+if abs(v_u[0]) > 1e-12:
+    v_u = v_u / v_u[0]
+
+v_u = np.real(v_u)
+
+print("x_L2 =", x_L2)
+print()
+print("Eigenvalues:")
+for ev in eigvals:
+    print(ev)
+print()
+print("Unstable eigenvalue:")
+print(lambda_u)
+print()
+print("Unstable eigenvector:")
+print(v_u)
+
+# ============================================================
+# 9. INITIAL CONDITION
+# ============================================================
+x0  = x_L2 + eps
+y0  = 0.0
+z0  = eps
+vx0 = 0.0
+vy0 = vy_init
+vz0 = 0.0
+
+U0 = np.array([x0, y0, z0, vx0, vy0, vz0], dtype=float)
+
+# ============================================================
+# 10. INTEGRATE TRAJECTORY
+# ============================================================
+t_eval = np.linspace(t0, tf, N)
+
+sol = solve_ivp(
+    cr3bp_3d,
+    (t0, tf),
+    U0,
+    args=(mu,),
+    t_eval=t_eval,
+    rtol=1e-10,
+    atol=1e-12
+)
+
+t = sol.t
+x = sol.y[0]
+y = sol.y[1]
+z = sol.y[2]
+
+# ============================================================
+# 11. DISTANCE FROM L2
+# ============================================================
+d = np.sqrt((x - x_L2)**2 + y**2 + z**2)
+
+# ============================================================
+# 12. 3D PLOT
+# ============================================================
+fig = plt.figure(figsize=(10, 8))
+ax = fig.add_subplot(111, projection='3d')
+
+ax.plot(x, y, z, linewidth=2, label='Trajectory near $L_2$')
+ax.scatter([x_L2], [0], [0], s=100, label='$L_2$')
+ax.scatter([x[0]], [y[0]], [z[0]], s=80, label='Start')
+ax.scatter([x[-1]], [y[-1]], [z[-1]], s=80, label='End')
+
+pad_x = 0.0002
+pad_y = 0.0002
+pad_z = 0.0002
+
+ax.set_xlim([min(np.min(x), x_L2) - pad_x, max(np.max(x), x_L2) + pad_x])
+ax.set_ylim([min(np.min(y), 0.0) - pad_y, max(np.max(y), 0.0) + pad_y])
+ax.set_zlim([min(np.min(z), 0.0) - pad_z, max(np.max(z), 0.0) + pad_z])
+
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.set_zlabel('z')
+ax.set_title('3D Trajectory Near Sun-Jupiter $L_2$')
+ax.legend()
+plt.show()
+
+# ============================================================
+# 13. x-y PROJECTION
+# ============================================================
+plt.figure(figsize=(7, 6))
+plt.plot(x, y, linewidth=2, label='Trajectory')
+plt.scatter([x_L2], [0], s=60, label='$L_2$')
+plt.scatter([x[0]], [y[0]], s=50, label='Start')
+plt.scatter([x[-1]], [y[-1]], s=50, label='End')
+
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('x-y Projection Near $L_2$')
+plt.axis('equal')
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# ============================================================
+# 14. x-z PROJECTION
+# ============================================================
+plt.figure(figsize=(7, 6))
+plt.plot(x, z, linewidth=2, label='Trajectory')
+plt.scatter([x_L2], [0], s=60, label='$L_2$')
+plt.scatter([x[0]], [z[0]], s=50, label='Start')
+plt.scatter([x[-1]], [z[-1]], s=50, label='End')
+
+plt.xlabel('x')
+plt.ylabel('z')
+plt.title('x-z Projection Near $L_2$')
+plt.axis('equal')
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# ============================================================
+# 15. DISTANCE FROM L2 VS TIME
+# ============================================================
+plt.figure(figsize=(8, 5))
+plt.plot(t, d, linewidth=2)
+plt.xlabel('t')
+plt.ylabel('d(t)')
+plt.title('Distance from $L_2$ vs Time')
+plt.grid(True)
+plt.show()
+
+
+
+
+
+# ============================================================
+# SMALL AMPLITUDE HALO ORBIT EXPLORATION
+# ============================================================
+
+
+
+
+
+# ============================================================
+# 1. PARAMETERS
+# ============================================================
+mu = 9.53e-4
+rtol = 1e-10
+atol = 1e-12
+
+eps_x = 1.0e-4
+Az_list = [1e-4, 4e-4, 8e-4]
+vy_init = 0.02
+
+t0 = 0.0
+tf = 15.0
+N = 6000
+
+# ============================================================
+# 2. DISTANCES
+# ============================================================
+def r1(x, y, z):
+    return np.sqrt((x + mu)**2 + y**2 + z**2)
+
+def r2(x, y, z):
+    return np.sqrt((x - (1 - mu))**2 + y**2 + z**2)
+
+# ============================================================
+# 3. OMEGA DERIVATIVES
+# ============================================================
+def dOmega_dx(x, y, z):
+    return x - (1-mu)*(x+mu)/r1(x,y,z)**3 - mu*(x-(1-mu))/r2(x,y,z)**3
+
+def dOmega_dy(x, y, z):
+    return y - (1-mu)*y/r1(x,y,z)**3 - mu*y/r2(x,y,z)**3
+
+def dOmega_dz(x, y, z):
+    return -(1-mu)*z/r1(x,y,z)**3 - mu*z/r2(x,y,z)**3
+
+# ============================================================
+# 4. FIND L2
+# ============================================================
+def find_L2():
+    f = lambda x: dOmega_dx(x,0,0)
+    sol = root_scalar(f, bracket=[1-mu+1e-4,1.5])
+    return sol.root
+
+x_L2 = find_L2()
+
+# ============================================================
+# 5. DYNAMICS
+# ============================================================
+def cr3bp(t,U):
+    x,y,z,vx,vy,vz = U
+    ax = 2*vy + dOmega_dx(x,y,z)
+    ay = -2*vx + dOmega_dy(x,y,z)
+    az = dOmega_dz(x,y,z)
+    return [vx,vy,vz,ax,ay,az]
+
+# ============================================================
+# 6. SIMULATE CANDIDATES
+# ============================================================
+trajectories = []
+
+for Az in Az_list:
+
+    U0 = [x_L2+eps_x, 0, Az, 0, vy_init, 0]
+
+    t_eval = np.linspace(t0,tf,N)
+
+    sol = solve_ivp(cr3bp,[t0,tf],U0,t_eval=t_eval,rtol=rtol,atol=atol)
+
+    x,y,z = sol.y[0], sol.y[1], sol.y[2]
+    t = sol.t
+
+    r_xy = np.sqrt((x-x_L2)**2 + y**2)
+    d3   = np.sqrt((x-x_L2)**2 + y**2 + z**2)
+
+    trajectories.append((Az,t,x,y,z,r_xy,d3))
+
+# ============================================================
+# 7. PLOTS
+# ============================================================
+
+# --- 3D ---
+fig = plt.figure(figsize=(10,8))
+ax = fig.add_subplot(111,projection='3d')
+
+for Az,t,x,y,z,_,_ in trajectories:
+    ax.plot(x,y,z,label=f"Az={Az:.1e}")
+
+ax.scatter([x_L2],[0],[0],s=80,label='L2')
+ax.set_title("Halo-style Candidates (Uncontrolled)")
+ax.legend()
+plt.show()
+
+# --- z(t) ---
+plt.figure()
+for Az,t,_,_,z,_,_ in trajectories:
+    plt.plot(t,z,label=f"Az={Az:.1e}")
+plt.title("Vertical Motion")
+plt.legend()
+plt.grid()
+plt.show()
+
+# --- planar distance ---
+plt.figure()
+for Az,t,_,_,_,r_xy,_ in trajectories:
+    plt.plot(t,r_xy,label=f"Az={Az:.1e}")
+plt.title("Planar Distance from L2")
+plt.legend()
+plt.grid()
+plt.show()
+
+# --- full distance ---
+plt.figure()
+for Az,t,_,_,_,_,d3 in trajectories:
+    plt.plot(t,d3,label=f"Az={Az:.1e}")
+plt.title("Full Distance from L2")
+plt.legend()
+plt.grid()
+plt.show()
+
