@@ -54,4 +54,4 @@ pdflatex report.tex && pdflatex report.tex   # compile report
 
 ## 📜 License
 
-CC BY 4.0. Cite as: Volkov A., "Stabilization of periodic orbits near the Sun–Jupiter L₂ libration point," 2026.
+CC BY 4.0. Cite as: Gabitov I., "Stabilization of periodic orbits near the Sun–Jupiter L₂ libration point," 2026.
